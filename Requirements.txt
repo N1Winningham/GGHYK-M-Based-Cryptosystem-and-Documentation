@@ -3,6 +3,7 @@ Key Gen:
   -Private basis needs low orthognality; nearly orthogonal
 
 Encryption: (exact same as GGH-YK)
+  -Each character is turned into its ASCII value and that is the number put into the M-matrix
   
 
 
