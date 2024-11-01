@@ -1,0 +1,13 @@
+Key Gen:
+  -Public basis needs high orthognality
+  -Private basis needs low orthognality; nearly orthogonal
+
+Encryption: (exact same as GGH-YK)
+  
+
+
+Decryption: (Similar to GGH-YK, but messasge bits are only encoded into the S; T is redundant)
+  
+
+Other:
+  Dimensions - start with 2D for proof of concept; -> 10 -> 100 -> 400
