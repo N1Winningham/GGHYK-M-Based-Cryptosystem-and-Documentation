@@ -12,3 +12,16 @@ Decryption: (Similar to GGH-YK, but messasge bits are only encoded into the S; T
 
 Other:
   Dimensions - start with 2D for proof of concept; -> 10 -> 100 -> 400
+
+
+
+
+Steps:
+1. Give text to encrypt.
+2. Turn text into binary/ASCII.
+3. Turn the ASCII into a vector.
+4. Generate a good basis (Private).
+5. Generate a bad basis (Public).
+6. Generate the lattice based off the bases.
+7. Encode message into the lattice.
+8. Add noise/perturbation.
