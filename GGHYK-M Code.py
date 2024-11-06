@@ -3,11 +3,41 @@ import matplotlib.pyplot as plt
 
 # Demonstration
 latRange = 6  # Defines the number of points shown on the lattice
-e = 0.5   # Defines the perturbation value
+e = 0   # Roudning error
 n = 2  # Dimension of the lattice
+r = 0.5 # Perturbation vector
 I = (n, n) # Identity matrix
-# gamma = np.random.uniform(1, 1000)
+gamma = np.random.randint(n, n+1000) # Random gamma value
+P = np.random.choice([-1, 0, 1], size=(n, n))
+B = gamma * I + P
+A = B^(-1)
+i = 0 # Row index
+j = 0 # Column index
+k = 100 # Decides how difficult the encryption is
+h = 0
 
+
+# Generate lattice points based on B (Parameter 1)
+def generateLatticePoints(basis, multiplierRange=range(-latRange, latRange)):
+    u = np.array([i, j])  # Integer vector u ∈ Z^n (2D in this case)
+    point = np.dot(B, u)  # Multiply matrix B by vector u to get the lattice point
+    points.append(point)
+    return np.array(points)
+
+# Genereates the Orthogonality Defect of B (Parameter 2)
+def orthogonalityDefect(B):
+    vectorLength = np.linalg.norm(B, axis=1) # Determines the length of each vector in basis B
+    detB = np.linalg.det(B) # Determines the determinant of the matrix
+    oDefect = np.prod(vectorLength) / abs(detB) # Determines the orthogonality defect
+
+# (Parameter 8 and 4)
+if (i == j):
+    A[i,j] <= 2/gamma
+else:
+    A[i,j] < 2/gamma^2
+
+# (Parameter 7)
+2k + 2h < gamma
 
 # Message input
 message = input("Enter the secret message: ")  # Input message
@@ -16,11 +46,6 @@ asciiMessage = [ord(char) for char in message]  # Convert message to ASCII value
 # Generate Bases
 goodBasis = np.array([[2, 1], [1, 2]])  # Private basis (W)
 badBasis = np.array([[4, 1], [1, 3]])  # Public basis (U)
-
-# Generate lattice points based on a basis
-def generateLatticePoints(basis, multiplierRange=range(-latRange, latRange)):
-    points = [i * basis[:, 0] + j * basis[:, 1] for i in multiplierRange for j in multiplierRange]
-    return np.array(points)
 
 # Lattice Generation
 privateLatticePoints = generateLatticePoints(goodBasis)
@@ -33,7 +58,9 @@ def encodeMessage(asciiValues, latticePoints):
 
 # Function to add Perturbation
 def addPerturbation(points):
-    perturbation = np.random.uniform(-e, e, points.shape)
+    perturbation = np.random.uniform(-r, r, points.shape)
+    # Perturbation = np.zeros(n)    # This assigns all values of the perturbation vector to 0
+    # nonZeroPurturbation = np.random.choice(n, size=k, replace=False)
     return points + perturbation
 
 # Encode message to lattice points
