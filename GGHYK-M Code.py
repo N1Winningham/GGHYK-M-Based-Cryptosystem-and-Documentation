@@ -13,7 +13,7 @@ B = gamma * I + P
 A = B^(-1)
 i = 0 # Row index
 j = 0 # Column index
-k = 100
+k = 100 # Decides how difficult the encryption is
 h = 0
 
 
