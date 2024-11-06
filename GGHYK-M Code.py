@@ -13,7 +13,7 @@ B = gamma * I + P
 A = B^(-1)
 i = 0 # Row index
 j = 0 # Column index
-k = 0
+k = 100
 h = 0
 
 
