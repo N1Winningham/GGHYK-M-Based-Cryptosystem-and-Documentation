@@ -17,19 +17,6 @@ def readFile(filePathname):
                 asciiValues.append(0)  # Pad with null if chunk is less than 2 characters
             yield np.array(asciiValues)
 
-# Function to generate lattice points
-def generateLatticePoints(basis):
-    bounds = (-10, 10)  # Bounds for the lattice points
-    x, y = np.meshgrid(
-        np.arange(bounds[0], bounds[1] + 1),
-        np.arange(bounds[0], bounds[1] + 1)
-    )
-    integerPoints = np.column_stack((x.flatten(), y.flatten()))  # Stack the x and y values into a 2D array
-    latticePoints = np.dot(integerPoints, basis)  # Matrix multiplication
-    distances = np.linalg.norm(latticePoints, axis=1)
-    sortedIndices = np.argsort(distances)
-    return latticePoints[sortedIndices]
-
 def encodeMessage(asciiValues, latticePoints):
     maxValue = max(asciiValues)
     # Map ASCII values to lattice points
