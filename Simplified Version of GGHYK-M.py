@@ -64,16 +64,24 @@ def processNumbersWithAdjustments(encryptedChunks):
                 value -= unicodeMax
                 adjustment += 2  # Increment adjustment for each overflow
 
+            if 0 <= value <= 31:
+                value += 31  # Shift the value out of the restricted range
+                adjustment += 900000000  # Mark as large for restricted range
+
             processedNumbers.append(value)
             adjustments.append(adjustment)
 
     return processedNumbers, adjustments
+
 
 # Function to apply adjustments during decryption
 def applyAdjustments(processedNumbers, adjustments):
     adjustedNumbers = []
     for i, value in enumerate(processedNumbers):    # Runs through the list and access the index and content in that index
         adjustment = adjustments[i]
+        if adjustment >= 900000000: # Large adjustment indicates the value was in the restricted range
+            adjustment -= 900000000  
+            value -= 31  # Reverse the addition of 31 made during encryption
         if adjustment % 2 == 1:  # Odd adjustment indicates the value was negative
             value = -value
         value += (adjustment // 2) * unicodeMax  # Add back overflows
