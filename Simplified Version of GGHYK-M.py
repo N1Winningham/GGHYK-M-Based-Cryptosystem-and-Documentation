@@ -5,7 +5,6 @@ import os
 r = 0.5  # Perturbation vector
 e = 0  # Rounding error vector
 unicodeMax = 1114111  # Maximum Unicode value
-newline_replacement_char = chr(0x2028)  # Unicode character for Line Separator
 
 # Function to read text in the input file
 def readFile(filePathname, chunkSize):
@@ -59,16 +58,12 @@ def processNumbersWithAdjustments(encryptedChunks):
                 value -= unicodeMax
                 adjustment += 2  # Track adjustment (overflow)
 
-            if value == ord('\n'):
-                value = ord(newline_replacement_char)  # Replace newline character
-                adjustment += 0.75  # Track newline replacement adjustment
-
             if 0 <= value <= 31:
                 value += 31  # Avoid the control characters
                 adjustment += 0.5  # Track adjustment (control)
 
             if 55296 <= value <= 57343:
-                value -= 2047   # Avoid the surrogate pairs
+                value += 2047   # Avoid the surrogate pairs
                 adjustment += 0.333 # Track adjustment (surrogate)
 
             processedNumbers.append(value)
@@ -82,16 +77,13 @@ def applyAdjustments(processedNumbers, adjustments):
     for i, value in enumerate(processedNumbers):
         adjustment = adjustments[i]
         if adjustment % 1 != 0:
-            if adjustment % 1 == 0.75:
-                value = ord('\n')  # Reverse newline replacement
-            else:
-                adjustment -= 0.5
-                value -= 31  # Reverse control adjustment
+            adjustment -= 0.5
+            value -= 31  # Reverse control adjustment
         if int(adjustment) % 2 == 1:
             value = -value  # Reverse negative adjustment
         value += (int(adjustment) // 2) * unicodeMax  # Reverse overflow wrapping
         if round(adjustment % 1, 3) == 0.333:
-            value += 2047  # Reverse surrogate adjustment
+            value -= 2047  # Reverse surrogate adjustment
         adjustedNumbers.append(value)
     return adjustedNumbers
 
