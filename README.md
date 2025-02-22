@@ -1,4 +1,4 @@
-# GGHYK-M-Implementation-and-Documentation
+# GGHYK-M-Based-Cryptosystem-and-Documentation
 A documented implementation and optimization of the GGHYK-M cryptosystem in Python.
 
 
