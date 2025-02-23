@@ -1,6 +1,5 @@
 ##This cryptosystem takes inspiration from GGHYK-M while changing properties and adding a scramble to ensure exact matrices are required to give the proper output.
 
-from decimal import Decimal
 import numpy as np
 import os
 
@@ -23,21 +22,21 @@ def readFile(filePathname, chunkSize):
 # Encryption function
 def encrypt(basis, message):
     scrambledValues, remainderIndices = scramble(basis, message)  # Scrambles the message
-    scrambledValues = [Decimal(x) for x in scrambledValues]   # Converts to Decimal
     
-    basisSize = basis.shape[0] # Gets the size of the basis matrix
+    basisSize = basis.shape[0]  # Gets the size of the basis matrix
 
     # Adds padding if needed
     if len(scrambledValues) % basisSize != 0:
         paddingNeeded = basisSize - (len(scrambledValues) % basisSize)
-        scrambledValues.extend([Decimal(0)] * paddingNeeded)
+        scrambledValues.extend([0] * paddingNeeded)
 
-    # Reshape into chunks of basis size
-    scrambledValues = np.array(scrambledValues, dtype=object).reshape(-1, basisSize)
+    # Reshape into chunks of basis size - directly using numpy arrays
+    scrambledValues = np.array(scrambledValues).reshape(-1, basisSize)
     
     result = []
     for pair in scrambledValues:
-        res = np.dot(pair.astype(float), basis.T.astype(float))
+        # Perform matrix multiplication directly with floats
+        res = np.dot(pair, basis.T)
         #print(res, "\n")   # Debugging
         result.extend(res.flatten())
 
@@ -294,23 +293,23 @@ def scramble(basis, message):
         operationType = i % 4
         
         if operationType == 0:  # Multiply every 4th value (1,5,9,etc.)
-            values *= val
-            #print(f"After multiplication by {val}: ", values)  # Debugging
+            if val != 0:
+                values *= val
+                #print(f"After multiplication by {val}: ", values)  # Debugging
+            # elif val == 0 do nothing (multiply by one)
             
         elif operationType == 1:  # Divide every 4th value (2,6,10,etc.)
             if val != 0:  # Protect against division by zero
                 remainders = values % abs(val)  # Use absolute divisor for remainder
                 quotient = (values - remainders) / val  # Compute correct integer division
-                
+
                 remainderIndices[i] = remainders.tolist()
                 values = quotient
-            else:
-                values = values // 1  # Use 1 if val is 0
+            # elif val == 0 do nothing (divide by one)
             
             #print(f"After division by {val}: ", values)    # Debugging
             #if i in remainderIndices:
             #    print(f"Remainders stored at index {i}: ", remainderIndices[i])    # Debugging
-
             
         elif operationType == 2:  # Add every 4th value (3,7,11,etc.)
             values += val
@@ -345,13 +344,16 @@ def unscramble(basis, encryptedValues, remainderIndices):
         elif operationType == 2:  # Reverse addition
             values = values - val
         elif operationType == 1:  # Reverse division
-            if i in remainderIndices:
-                values = values * val + np.array(remainderIndices[i])
-            else:
-                values = values * val
+            if val != 0:
+                if i in remainderIndices:
+                    values = values * val + np.array(remainderIndices[i])
+                else:
+                    values = values * val
+            # elif val == 0 do nothing (multiply by one)
         elif operationType == 0:  # Reverse multiplication
             if val != 0:
                 values = values / val
+            # elif val == 0 do nothing (divide by one)
                 
         #print(f"After: {values}")  # Debugging
     
@@ -476,4 +478,3 @@ if __name__ == "__main__":
     else:
         print("Invalid option, please enter 1 or 2.")
         exit(1)
-
