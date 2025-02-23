@@ -1,9 +1,6 @@
 import numpy as np
 import os
 
-# Constants
-r = 0.5  # Perturbation vector
-e = 0  # Rounding error vector
 unicodeMax = 1114111  # Maximum Unicode value
 
 # Function to read text in the input file
@@ -19,85 +16,164 @@ def readFile(filePathname, chunkSize):
             yield np.array(asciiValues)  # Yield ASCII values as a NumPy array
 
 # Encryption function
-def encrypt(basis, message, e):
-    cipherText = np.dot(basis, message) + e  # Matrix-vector multiplication with addition of rounding error
-    return cipherText
+def encrypt(basis, message):
+    
+    basis_size = basis.shape[0]
+
+    if message.size % basis_size != 0:
+        padding_needed = basis_size - (message.size % basis_size)
+        message = np.append(message, np.zeros(padding_needed))
+
+    message = message.reshape(-1, basis_size)
+
+    result = []
+    for pair in message:
+        res = np.dot(pair, basis.T)
+        result.extend(res.flatten())
+    
+    # Convert to list of floats
+    return [float(x) for x in result]
 
 # Decryption function
-def decrypt(basis, message, e):
-    basisInv = np.linalg.inv(basis)  # Compute the inverse of the basis matrix
-    adjustedMessage = np.dot(basisInv, message - e)  # Apply the inverse and subtract the rounding vector
-    roundedMessage = np.rint(adjustedMessage).astype(int)  # Round to the nearest integers
-    return roundedMessage
+def decrypt(basis, message):
+    basis_inverse = np.linalg.inv(basis)
+    message_array = np.array(message)
+    
+    # Reshape message into appropriate dimensions
+    basis_size = basis.shape[0]
+    if message_array.size % basis_size != 0:
+        raise ValueError("Message size is not a multiple of basis size")
+    
+    message_array = message_array.reshape(-1, basis_size)
+    
+    # Perform inverse transformation
+    result = np.dot(message_array, basis_inverse)
+    
+    # Round to nearest integer and convert to int type
+    result = np.round(result).astype(int)
+    result = result[~np.all(result == 0, axis=1)]  # Remove zero rows (padding)
+    
+    # Convert to characters, ensuring integers
+    return ''.join(chr(int(round(x))) for x in result.flatten() if 0 <= x < unicodeMax)
+
 
 # Function to write the result to a file on the Desktop
 def writeFile(outputPathname, dataChunks):
     desktopPathname = os.path.expanduser("~/Desktop")  # Get the Desktop path
     outputFile = os.path.join(desktopPathname, outputPathname)  # Construct the output file path
-
-    with open(outputFile, 'w') as file:
+    
+    print(f"Saving decrypted data to: {outputFile}")  # Debugging output file path
+    
+    with open(outputFile, 'w', encoding='utf-8') as file:
+        # Directly write each chunk as a string without modifying it
         for chunk in dataChunks:
-            file.write(''.join(chr(int(value)) for value in chunk if 0 <= value < 0x110000))  # Safely handle Unicode range
-    print(f"Data saved to {outputFile}")
+            #print(f"Writing chunk: {chunk}")  # Verify the content of each chunk
+            file.write(chunk)  # Write the chunk directly
+    
+    print(f"Decrypted data saved to {outputFile}")
+
 
 # Function to process encrypted numbers and generate adjustments
 def processNumbersWithAdjustments(encryptedChunks):
     processedNumbers = []
     adjustments = []
 
-    for chunk in encryptedChunks:
-        for value in chunk:
-            adjustment = 0
-            isNegative = value < 0  # Check if the value is negative
+    # Flatten encryptedChunks if it contains nested lists/tuples
+    encryptedChunks = np.array(encryptedChunks, dtype=np.float64).flatten()
 
-            if isNegative:
-                value = abs(value)  # Convert to positive (or apply absolute value)
-                adjustment += 1  # Track adjustment (negative)
+    for value in encryptedChunks:
+        adjustment = 0
+        # Convert to integer for comparison while preserving the sign
+        int_value = int(np.round(value))
+        isNegative = int_value < 0
 
-            while value > unicodeMax:
-                value -= unicodeMax
-                adjustment += 2  # Track adjustment (overflow)
+        if isNegative:
+            int_value = abs(int_value)
+            adjustment += 1  # Track adjustment (negative)
 
-            if 0 <= value <= 31:
-                value += 31  # Avoid the control characters
-                adjustment += 0.5  # Track adjustment (control)
+        # Handle large values
+        while int_value > unicodeMax:
+            int_value -= unicodeMax
+            adjustment += 2
 
-            if 55296 <= value <= 57343:
-                value += 2047   # Avoid the surrogate pairs
-                adjustment += 0.333 # Track adjustment (surrogate)
+        # Handle control characters
+        if 0 <= int_value <= 31:
+            int_value += 31
+            adjustment += 0.5
 
-            processedNumbers.append(value)
-            adjustments.append(adjustment)
+        # Handle surrogate pairs
+        if 55296 <= int_value <= 57343:
+            int_value += 2047
+            adjustment += 0.333
+
+        processedNumbers.append(int_value)
+        ##QUICK FIX##
+        adjustment = adjustment
+        adjustments.append(adjustment)
 
     return processedNumbers, adjustments
 
 # Function to apply adjustments during decryption
 def applyAdjustments(processedNumbers, adjustments):
     adjustedNumbers = []
+
     for i, value in enumerate(processedNumbers):
         adjustment = adjustments[i]
-        if adjustment % 1 != 0:
-            adjustment -= 0.5
-            value -= 31  # Reverse control adjustment
-        if int(adjustment) % 2 == 1:
-            value = -value  # Reverse negative adjustment
-        value += (int(adjustment) // 2) * unicodeMax  # Reverse overflow wrapping
+
+        # Reverse surrogate pair adjustment
         if round(adjustment % 1, 3) == 0.333:
-            value -= 2047  # Reverse surrogate adjustment
+            value -= 2047
+            adjustment -= 0.333  # Ensure tracking remains accurate
+
+        # Reverse control character adjustment
+        if adjustment % 1 == 0.5:
+            value -= 31
+            adjustment -= 0.5
+
+        # Reverse large value wrapping
+        while int(adjustment) >= 2:
+            value += unicodeMax
+            adjustment -= 2
+
+        # Reverse negative number adjustment
+        if int(adjustment) == 1:
+            value = -value
+            adjustment -= 1
+
         adjustedNumbers.append(value)
+
     return adjustedNumbers
 
 # Function to validate the key is an M-matrix
 def isMMatrix(matrix):
-    # Check if off-diagonal elements are less than or equal to 1
-    off_diagonal = matrix - np.diag(np.diagonal(matrix))
-    if np.any(np.abs(off_diagonal) > 1):
-        print("Error: Off-diagonal elements must have absolute values less than or equal to 1.")
+    matrix = np.array(matrix, dtype=np.float64)  # Ensure it's a float64 NumPy array
+    
+    # Check if off-diagonal elements are nonpositive
+    offDiagonal = matrix - np.diag(np.diagonal(matrix))
+    if np.any(offDiagonal > 0):  # Checks to see if any off-diagonal elements are positive
+        print("Error: Off-diagonal elements must be nonpositive.")
         return False
-    # Check if diagonal elements are greater than 1
-    if np.any(np.diagonal(matrix) <= 1):
-        print("Error: Diagonal elements must be greater than 1.")
+
+    # Checks that diagonal elements are greater than the sum of the absolute values of the off-diagonal elements
+    diagonal = np.diagonal(matrix)
+    rowSums = np.sum(np.abs(matrix), axis=1) - np.abs(diagonal)  # Calculate the row sums
+    if np.any(diagonal <= rowSums):  # Checks to see if any diagonal elements are less than or equal to the row sums
+        print("Error: Matrix is not strictly diagonally dominant.")
         return False
+    
+    # Checks if the determinant is non-positive (using log determinant method to avoid overflow)
+    sign, lodget = np.linalg.slogdet(matrix)
+    if sign <= 0:  # Checks if the determinant is non-positive
+        print(f"Error: Determinant is non-positive.")
+        return False
+    
+    # Check if all eigenvalues have non-negative real parts
+    eigenvalues = np.linalg.eigvals(matrix)  # Get the eigenvalues of the matrix
+    nonNegativeRealParts = np.all(np.real(eigenvalues) >= 0)  # Check if all eigenvalues have non-negative real parts
+    if nonNegativeRealParts == False:
+        print("Error: Matrix has eigenvalues with negative real parts.")
+        return False
+
     return True
 
 # Function to write processed numbers and adjustments to files
@@ -123,14 +199,26 @@ def writeProcessedAndAdjustments(processedNumbers, adjustments):
 # Function to auto-generate a random M-matrix of size n x n
 def generateAndSaveMMatrix(n):
     while True:
-        matrix = np.eye(n) * 2 + np.random.randint(-1, 2, (n, n))  # Fills diagonal elements > 1
-        np.fill_diagonal(matrix, np.random.randint(2, 9999999, n))  # Diagonal elements from 2 to a large number
+        # Generate the diagonal matrix with diagonal elements
+        matrix = np.eye(n) * 2 + np.random.randint(0, 1, (n, n))  # Generates the base matrix
+        np.fill_diagonal(matrix, np.random.randint(1, 9999999, n))  # Fills diagonal elements with value from 1 to a large number
+        
+        # Get the smallest diagonal value
+        smallestDiagonal = np.min(np.diagonal(matrix))
+        
+        # Replace the off-diagonal values to be between 0 and the negative of the smallest diagonal value divided by the size of the matrix
+        for i in range(n):
+            for j in range(n):
+                if i != j:  # Skip the diagonal elements
+                    matrix[i, j] = np.random.randint(-(smallestDiagonal/n), 1)  # Fills off-diagonal with values between -smallestDiagonal/n and 0
+        
         if isMMatrix(matrix):
             desktopPath = os.path.expanduser("~/Desktop")
             matrixFile = os.path.join(desktopPath, "m-matrix.txt")
             np.savetxt(matrixFile, matrix, fmt='%d')  # Save the matrix to file
             print(f"Generated M-matrix saved to {matrixFile}")
             return matrix
+
 
 # Main Program
 if __name__ == "__main__":
@@ -146,73 +234,77 @@ if __name__ == "__main__":
             print(f"Error: File '{filePathname}' not found.")
             exit(1)
 
-        m_matrix_file = input("Enter the path to the m-matrix file or leave blank to auto-generate: ").strip()
+        m_matrixFile = input("Enter the path to the m-matrix file or leave blank to auto-generate: ").strip()
 
-        if m_matrix_file:
-            if not os.path.isfile(m_matrix_file):
-                print(f"Error: M-matrix file '{m_matrix_file}' not found.")
+        if m_matrixFile:
+            if not os.path.isfile(m_matrixFile):
+                print(f"Error: M-matrix file '{m_matrixFile}' not found.")
                 exit(1)
 
-            goodBasis = np.loadtxt(m_matrix_file, dtype=int)
+            goodBasis = np.loadtxt(m_matrixFile, dtype=int)
             n = goodBasis.shape[0]
 
         else:
             n = int(input("Enter the size of the M-matrix to auto-generate: ").strip())
             goodBasis = generateAndSaveMMatrix(n)
 
-        e = np.array([(-1)**i for i in range(n)])  # Rounding error vector of size n
-
         encryptedChunks = []
         for asciiChunk in readFile(filePathname, n):
-            encryptedChunk = encrypt(goodBasis, asciiChunk, e)
+            encryptedChunk = encrypt(goodBasis, asciiChunk)
             encryptedChunks.append(encryptedChunk)
+            #print(encryptedChunk)  #Debugging
 
         # Process encrypted numbers and generate adjustments
         processedNumbers, adjustments = processNumbersWithAdjustments(encryptedChunks)
+        # for i in processedNumbers:
+        #     print(i)  # Debugging
 
         # Write processed numbers and adjustments to files
         writeProcessedAndAdjustments(processedNumbers, adjustments)
 
     elif choice == "2":
-        # Decryption
+        # Decryption process
         processedFile = input("Enter the path to the ciphertext file: ").strip()
         adjustmentsFile = input("Enter the path to the adjustments file: ").strip()
 
+        # Check if files exist
         if not os.path.isfile(processedFile) or not os.path.isfile(adjustmentsFile):
             print(f"Error: One or both required files not found.")
             exit(1)
 
-        m_matrix_file = input("Enter the path to the m-matrix file: ").strip()
-        if not os.path.isfile(m_matrix_file):
-            print(f"Error: M-matrix file '{m_matrix_file}' not found.")
+        # Read the m-matrix file
+        m_matrixFile = input("Enter the path to the m-matrix file: ").strip()
+        if not os.path.isfile(m_matrixFile):
+            print(f"Error: M-matrix file '{m_matrixFile}' not found.")
             exit(1)
 
-        goodBasis = np.loadtxt(m_matrix_file, dtype=int)
+        # Load the basis matrix
+        goodBasis = np.loadtxt(m_matrixFile, dtype=int)
         n = goodBasis.shape[0]
-        e = np.array([(-1)**i for i in range(n)])
 
         # Read processed numbers as Unicode characters and convert to numeric values
-        with open(processedFile, 'r') as file:
-            processedNumbers = [ord(char) for char in file.read()]
+        with open(processedFile, 'r', encoding='utf-8') as file:
+            processedNumbers = [ord(char) for char in file.read()]  # This treats each character as a number
 
         # Read adjustments from the adjustments file
         with open(adjustmentsFile, 'r') as file:
             adjustments = [float(line.strip()) for line in file]
 
-        # Apply adjustments to the numeric values
+        # Apply adjustments
         adjustedNumbers = applyAdjustments(processedNumbers, adjustments)
 
-        # Decryption of the final values
+        # Decrypt the numbers in chunks
         decryptedChunks = []
         for i in range(0, len(adjustedNumbers), n):
             chunk = adjustedNumbers[i:i + n]
             if len(chunk) == n:
-                decryptedChunk = decrypt(goodBasis, np.array(chunk), e)
+                decryptedChunk = decrypt(goodBasis, np.array(chunk))
                 decryptedChunks.append(decryptedChunk)
+            #print(decryptedChunks) # Debugging
 
         # Write the decrypted text to a file
-        writeFile(f"decrypted_text.txt", decryptedChunks)
+        writeFile("decrypted_text.txt", decryptedChunks)
 
     else:
-        print("Invalid option, please enter 1 or 2.")
+        ("Invalid option, please enter 1 or 2.")
         exit(1)
