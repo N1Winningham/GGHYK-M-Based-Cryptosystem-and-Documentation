@@ -175,10 +175,11 @@ def applyAdjustments(processedNumbers, adjustments):
             value -= 31
             adjustment -= 0.5
 
-        # Reverse large value wrapping
-        while int(adjustment) >= 2:
-            value += unicodeMax
-            adjustment -= 2
+        # Reverse overflow adjustment
+        if int(adjustment) >= 2:
+            overFlow = int(adjustment) // 2 # Finds number of times the overflow occurred
+            value += unicodeMax * overFlow
+            adjustment -= 2 * overFlow
 
         # Reverse negative number adjustment
         if int(adjustment) == 1:
@@ -403,7 +404,7 @@ if __name__ == "__main__":
 
         # Save remainder indices to a file
         desktopPath = os.path.expanduser("~/Desktop")
-        remainderFile = os.path.join(desktopPath, "remainder indices.txt")
+        remainderFile = os.path.join(desktopPath, "remainder_indices.txt")
         with open(remainderFile, 'w') as f:
             for key, value in allRemainderIndices.items():
                 f.write(f"{key}:{','.join(map(str, value))}\n")
@@ -471,10 +472,11 @@ if __name__ == "__main__":
                     decryptedText += decryptedChunk
         
         # Write the complete decrypted text
-        with open(os.path.join(os.path.expanduser("~/Desktop"), "decrypted text.txt"), 'w') as f:
+        with open(os.path.join(os.path.expanduser("~/Desktop"), "decrypted_text.txt"), 'w') as f:
             f.write(decryptedText)
             #print(f"Wrote {len(decryptedText)} characters to file")    # Debugging
 
     else:
         print("Invalid option, please enter 1 or 2.")
         exit(1)
+
