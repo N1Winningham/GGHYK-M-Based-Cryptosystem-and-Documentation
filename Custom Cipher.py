@@ -69,14 +69,18 @@ def decrypt(basis, message, remainderIndices):
        #print(f"After matrix multiplication: {res}")    # Debugging
         
         # Gets remainder indices for this chunk
-        chunkStart = i * basisSize
-        chunkEnd = chunkStart + basisSize
         chunkRemainders = {}
         for k, v in remainderIndices.items():
-            if chunkStart < len(v):
-                chunkRemainders[k] = v[chunkStart:chunkEnd] # Extracts the remainder indices for this chunk
+            startIdx = i * basisSize
+            endIdx = startIdx + basisSize
+            if startIdx < len(v):
+                endIdx = min(endIdx, len(v))  # Ensure we don't go beyond the length of v
+                chunkRemainders[k] = v[startIdx:endIdx]
+                # If we don't have enough values, pad with zeros
+                if endIdx - startIdx < basisSize:
+                    chunkRemainders[k].extend([0] * (basisSize - (endIdx - startIdx)))
             else:
-                chunkRemainders[k] = [0] * basisSize    # If the remainder index is out of range, pad with zeros
+                chunkRemainders[k] = [0] * basisSize
         
         # Applies unscrambling
         decryptedValues = unscramble(basis, res, chunkRemainders)
@@ -85,8 +89,8 @@ def decrypt(basis, message, remainderIndices):
         # Converts numerical values to characters (without filtering)
         for val in decryptedValues:
             if isinstance(val, (int, float)):
+                #print(int(val)) # Debugging
                 charVal = int(round(val))  # Round and convert to integer
-                #print(charVal) # Debugging
                 char = chr(charVal)  # Convert directly to character
                 if char != '\0':  # Exclude null characters
                     result.append(char)
@@ -373,7 +377,6 @@ if __name__ == "__main__":
         filePathname = input("Enter the path to the text file to encrypt (must be a .txt file): ").strip()
         if not os.path.isfile(filePathname):
             print(f"Error: File '{filePathname}' not found.")
-            exit(1)
 
         m_matrixFile = input("Enter the path to the m-matrix file or leave blank to auto-generate: ").strip()
 
@@ -381,7 +384,6 @@ if __name__ == "__main__":
         if m_matrixFile:
             if not os.path.isfile(m_matrixFile):
                 print(f"Error: M-matrix file '{m_matrixFile}' not found.")
-                exit(1)
 
             m_matrix = np.loadtxt(m_matrixFile, dtype=int)
             n = m_matrix.shape[0]
@@ -425,13 +427,11 @@ if __name__ == "__main__":
         # Check if files exist
         if not os.path.isfile(processedFile) or not os.path.isfile(adjustmentsFile) or not os.path.isfile(remainderFile):
             print(f"Error: One or more required files not found.")
-            exit(1)
 
         # Read the m-matrix file
         m_matrixFile = input("Enter the path to the m-matrix file: ").strip()
         if not os.path.isfile(m_matrixFile):
             print(f"Error: M-matrix file '{m_matrixFile}' not found.")
-            exit(1)
 
         # Load the matrix
         m_matrix = np.loadtxt(m_matrixFile, dtype=int)
@@ -478,5 +478,3 @@ if __name__ == "__main__":
 
     else:
         print("Invalid option, please enter 1 or 2.")
-        exit(1)
-
